@@ -1,4 +1,4 @@
-<h1 align="center">Nextjs-Railwind-Contentlayer-Blog</h1>
+<h1 align="center">Nextjs-Tailwind-Contentlayer-Blog</h1>
 
 <p align="center">
   The most beautiful minimalist blog in modern built with Nextjs and tailwindcss.
