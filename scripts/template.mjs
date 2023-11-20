@@ -43,9 +43,12 @@ inquirer
       message: '是否创建图片',
     },
   ])
-  .then((res) => {
+  .then(async (res) => {
     const { fileName, fileTitle, isNeedImage } = res
     fileName && createFile(fileName, fileTitle)
+    if (isNeedImage) {
+      await fs.mkdir(join(cwd, `./public/images/${fileName}`))
+    }
     console.log(res, '--==')
   })
   .catch((error) => {

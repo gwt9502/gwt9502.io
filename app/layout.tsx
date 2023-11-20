@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
 import Sidebar from './components/sidebar'
 import ThemeProvider from './components/theme-provider'
@@ -48,6 +49,7 @@ export default function RootLayout({
           <ScrollToTop />
         </ThemeProvider>
         <Plum />
+        <Analytics mode="production" />
       </body>
       <Script
         async
