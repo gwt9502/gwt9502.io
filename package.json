@@ -12,6 +12,7 @@
   "dependencies": {
     "@giscus/react": "^2.3.0",
     "@tailwindcss/typography": "^0.5.10",
+    "@upstash/redis": "^1.25.1",
     "@vercel/analytics": "^1.1.1",
     "clsx": "^2.0.0",
     "contentlayer": "^0.3.4",

@@ -3,6 +3,8 @@ import { BlogCardHeader } from '@/app/components/blog/blog-card'
 import { notFound } from 'next/navigation'
 import Mdx from '@/app/components/mdx'
 import { Metadata } from 'next'
+import redis from '@/lib/redis'
+import { use } from 'react'
 
 type BlogSlugProps = {
   params: {
@@ -37,9 +39,11 @@ export default function BlogSlug({ params }: BlogSlugProps) {
     notFound()
   }
 
+  const view: number = use(redis.get(post.slug)) ?? 0
+
   return (
     <section>
-      <BlogCardHeader {...post} />
+      <BlogCardHeader {...post} view={view} trackView />
       <Mdx code={post.body.code} />
     </section>
   )
