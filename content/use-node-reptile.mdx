@@ -247,5 +247,15 @@ module.exports = async (images) => {
 
 ## 问题总结
 - 在ESmodule使用 `cluster.fork` 出来的进程，直接发送消息不生效，需要使用 `setTimeout` 包含，详见[Issues](https://github.com/nodejs/node/issues/34785)
+- 在下载图片到本地的时候会出现失败的情况，建议设置如下参数
+```js
+const http = require('http')
+const https = require('https')
+axios(url, {
+  timeout: 10000,
+  httpAgent: new http.Agent({ keepAlive: true }),
+  httpsAgent: new https.Agent({ keepAlive: true }),
+})
+```
 
 [源码地址](https://github.com/gwt9502-project/node-reptile)
