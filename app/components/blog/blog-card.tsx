@@ -12,7 +12,7 @@ type Props = Blog & {
 export function BlogCardHeader(props: Props) {
   const { title, readingTime, publishedAt, view, trackView, slug } = props
 
-  if (trackView) {
+  if (trackView && process.env.NODE_ENV === 'production') {
     use(redis.set(slug, view + 1))
   }
 

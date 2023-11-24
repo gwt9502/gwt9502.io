@@ -13,13 +13,17 @@ summary: 'This is your first blog post.'
 %s`
 
 async function createFile(fileName, fileTitle) {
-  const filePath = join(cwd, `./content/${fileName}.mdx`)
-  const isExist = await fs
-    .readFile(filePath)
-    .then(() => true)
-    .catch(() => false)
-  if (isExist) {
-    fs.writeFile(filePath, template.replace(/%s/g, fileTitle))
+  try {
+    const filePath = join(cwd, `./content/${fileName}.mdx`)
+    const isExist = await fs
+      .readFile(filePath)
+      .then(() => true)
+      .catch(() => false)
+    if (!isExist) {
+      fs.writeFile(filePath, template.replace(/%s/g, fileTitle), 'utf-8')
+    }
+  } catch (error) {
+    console.log('createFile field:', error)
   }
 }
 
@@ -49,7 +53,6 @@ inquirer
     if (isNeedImage) {
       await fs.mkdir(join(cwd, `./public/images/${fileName}`))
     }
-    console.log(res, '--==')
   })
   .catch((error) => {
     console.error(error)

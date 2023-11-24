@@ -1,0 +1,252 @@
+---
+title: '使用Nodejs多进程分页爬虫'
+publishedAt: '2023-11-23'
+summary: '通过Nodejs的快捷、简便性，爬取某网站二次元图片下载到本地'
+---
+
+[Axios]: https://github.com/axios/axios
+[Cheerio]: https://github.com/cheeriojs/cheerio
+[Async]: https://github.com/caolan/async
+
+## 前言
+why is node?
+> 通过[Nodejs官网](https://nodejs.org/en/learn/getting-started/introduction-to-nodejs)介绍可以知道，Nodejs 在浏览器外部运行 V8 JavaScript 引擎，这是 Google Chrome 的核心。这使得 Nodejs 具有非常高的性能。
+
+源码地址我会放到文章末，请自取
+
+通过这篇文章，希望你看完有以下收获
+- [Cluster](https://nodejs.org/docs/latest-v21.x/api/cluster.html)子进程与主进程间通信
+- [Axios][Axios]下载图片到本地
+- [Cheerio][Cheerio]服务端操作html
+
+`node`本身提供了`cluster`和`child_process`模块创建子进程，本质上`cluster.fork()`是`child_process.fork()`的上层实现，`cluster`带来的好处是可以监听共享端口，否则建议使用`child_process`，本文主要通过`cluster`模块创建子进程
+
+## 架构图
+<Image
+  src={`/images/use-node-reptile/architecture.png`}
+  width={400}
+  height={400}
+/>
+
+
+## 目标分析
+
+> 作为二次元爱好者，怎么能错过每次收藏图片的机会呢 
+
+[打开网站](https://e-shuushuu.net/)
+<div className='flex justify-center items-center'>
+  <Image
+    src={`/images/use-node-reptile/2d.png`}
+    width={800}
+    height={800}
+  />
+</div>
+
+本次我们来爬取[二次元网站](https://e-shuushuu.net/)的小姐姐，并且把获取到的图片下载到本地
+
+## 安装依赖
+- [Axios][Axios]主要请求页面，以及下载图片
+- [Cheerio][Cheerio]在服务端像Jq操作html一样
+- [Async][Async]批量下载图片
+
+```sh
+# 安装依赖
+pnpm add request cheerio asnyc
+```
+
+## 实战操作
+新建 `index.js`文件，通过 `cluster` 的 `isPrimary` 方法判断是否是主进程。通过 [setupPrimary](https://nodejs.org/docs/latest-v21.x/api/cluster.html#clustersetupprimarysettings) 方法设置子进程运行的文件路径，通过 `cluster` 的 `fork` 方法创建子进程，获取当前机器的cpu数量，表示可以开启多少个子进程，`fork` 出来的worker进程通过 `send` 方法向子进程发送参数，通过监听 `message` 事件，可以获取子进程传来的数据
+
+```js title="index.js"
+#!/usr/bin/env node
+const cluster = require('node:cluster')
+const cpuNums = require('node:os').cpus().length
+
+const allPage = 10 // 需要爬取的页数
+let curPage = 0 // 当前爬取的页数
+let images = [] // 爬取的图片
+
+// 是否是主进程
+if (cluster.isPrimary) {
+  cluster.setupPrimary({
+    exec: 'worker.js', // 子进程文件的文件路径
+    args: ['--use', 'https'], // 传给工作进程的字符串参数。 默认值： process.argv.slice(2)
+  })
+
+  for (let i = 0; i < Math.min(allPage, cpuNums); i++) {
+    const worker = cluster.fork()
+    curPage++
+    // 发送当前页给子进程
+    worker.send(curPage)
+    // 监听子进程发送来的消息
+    worker.on('message', (data) => {
+      images = [...images, ...JSON.parse(data)]
+      curPage++
+      // 判断当前页是否大于需要爬取的页数
+      if (curPage > allPage) {
+        // 关闭当前进程
+        worker.disconnect()
+        // 判断当前是否存在子进程，如果不存在，证明爬取完成，开始下载图片
+        if (!Object.keys(cluster.workers).length) {
+          cluster.disconnect()
+          download(images)
+        }
+      } else {
+        // 子进程继续爬取数据
+        worker.send(curPage)
+      }
+    })
+  }
+
+  cluster.on('fork', (worker) => {
+    console.log(`cluster fork worker ${worker.process.pid} \n`)
+  })
+
+  // 监听子进程异常退出
+  cluster.on('exit', (worker, code, signal) => {
+    if (code !== 0) {
+      cluster.fork()
+    } else {
+      console.log(`子进程 ${worker.process.pid} 关闭`)
+    }
+  })
+
+}
+```
+
+新建 `worker.js` 文件，通过监听 `message` 获取父进程传来的参数，进行爬取，获取数据后通过 `send` 方法发送数据通知父进程
+
+```js title="worker.js"
+#!/usr/bin/env node
+const cluster = require('node:cluster')
+const { spider } = require('./spider')
+
+if (cluster.isWorker) {
+  process.on('message', async (page) => {
+    console.log(`当前爬取第 ${page} 页`)
+    try {
+      const data = await spider(page)
+      console.log(
+        `子进程 ${process.pid} 成功爬取第 ${page} 页 ${data.length}条数据`
+      )
+      process.send(JSON.stringify(data))
+    } catch (error) {
+      console.log(error)
+    }
+  })
+}
+
+```
+
+新建 `spider.js` 文件，主要通过[Axios][Axios]进行数据爬取，然后通过[Cheerio][Cheerio]解析出爬取到的图片链接
+
+```js title="spider.js"
+#!/usr/bin/env node
+const axios = require('axios')
+const cheerio = require('cheerio')
+
+const baseUrl = 'https://e-shuushuu.net'
+
+function spider(page) {
+  return axios(`${baseUrl}?page=${page}`, { responseType: 'text' }).then(
+    (res) => {
+      const $ = cheerio.load(res.data)
+      const data = []
+      $('#content .image_thread .thumb_image').each(function (index) {
+        data[index] = $(this).attr('href')
+      })
+      return data
+    }
+  )
+}
+
+module.exports = {
+  baseUrl,
+  spider,
+}
+
+
+```
+ 新建 `download.js` 文件，通过[Axios][Axios]的流方式下载图片，通过[Async][Async]批量下载
+
+ ```js title="download.js"
+#!/usr/bin/env node
+const axios = require('axios')
+const asnyc = require('async')
+const fs = require('fs')
+const http = require('http')
+const https = require('https')
+const { join } = require('path')
+const { baseUrl } = require('./spider')
+
+const imagesPath = join(process.cwd(), './images/')
+
+function downloadField(url = '', callback) {
+  const fileName = url.split('/').slice(-1)[0]
+  console.log(`图片: ${fileName} 开始下载`)
+  axios(baseUrl + url, {
+    responseType: 'stream',
+    timeout: 10000,
+    httpAgent: new http.Agent({ keepAlive: true }),
+    httpsAgent: new https.Agent({ keepAlive: true }),
+  })
+    .then((res) => {
+      res.data.pipe(fs.createWriteStream(`./images/${fileName}`))
+      console.log('\x1B[32m', `图片: ${fileName} 下载成功`)
+      callback && callback(null, fileName)
+    })
+    .catch((error) => {
+      console.log('\x1B[31m%s\x1B[0m', `图片: ${fileName} 下载失败`)
+      callback && callback(error)
+    })
+}
+
+module.exports = async (images) => {
+  let imageDirExist = false
+  try {
+    imageDirExist = !!fs.readdirSync(imagesPath)
+  } catch (error) {
+    imageDirExist = false
+  }
+  if (!imageDirExist) {
+    fs.mkdirSync(imagesPath)
+  }
+  asnyc.map(
+    images,
+    function (url, callback) {
+      setTimeout(() => {
+        downloadField(url, callback)
+      }, 1000)
+    },
+    function (error, results) {
+      if (error) {
+        console.error(`download file error:${error}`)
+      } else {
+        console.log('\x1B[32m', `download ${results.length} file success`)
+      }
+    }
+  )
+}
+
+```
+
+## 效果
+终端运行 `node index.js` 查看效果
+<Image
+  src={`/images/use-node-reptile/fork.png`}
+  width={400}
+  height={400}
+/>
+
+下载图片日志
+<Image
+  src={`/images/use-node-reptile/download.png`}
+  width={400}
+  height={400}
+/>
+
+## 问题总结
+- 在ESmodule使用 `cluster.fork` 出来的进程，理解发送消息不生效，需要使用 `setTimeout` 包含，详见[Issues](https://github.com/nodejs/node/issues/34785)
+- 
+
+[源码地址](https://github.com/gwt9502-project/node-reptile)
