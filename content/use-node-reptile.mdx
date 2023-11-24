@@ -246,7 +246,6 @@ module.exports = async (images) => {
 />
 
 ## 问题总结
-- 在ESmodule使用 `cluster.fork` 出来的进程，理解发送消息不生效，需要使用 `setTimeout` 包含，详见[Issues](https://github.com/nodejs/node/issues/34785)
-- 
+- 在ESmodule使用 `cluster.fork` 出来的进程，直接发送消息不生效，需要使用 `setTimeout` 包含，详见[Issues](https://github.com/nodejs/node/issues/34785)
 
 [源码地址](https://github.com/gwt9502-project/node-reptile)
