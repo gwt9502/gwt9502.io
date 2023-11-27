@@ -4,7 +4,9 @@ import { notFound } from 'next/navigation'
 import Mdx from '@/app/components/mdx'
 import { Metadata } from 'next'
 import redis from '@/lib/redis'
-import { use } from 'react'
+import { use, Suspense } from 'react'
+import Dir from '@/app/components/blog/dir'
+import clsx from 'clsx'
 
 type BlogSlugProps = {
   params: {
@@ -45,6 +47,19 @@ export default function BlogSlug({ params }: BlogSlugProps) {
     <section>
       <BlogCardHeader {...post} view={view} trackView />
       <Mdx code={post.body.code} />
+      <Suspense fallback={'loading...'}>
+        <aside
+          className={clsx(
+            'fixed top-36 right-5',
+            'py-4 w-48',
+            'hidden lg:block'
+          )}
+        >
+          <div className="sticky top-20 right-10">
+            <Dir />
+          </div>
+        </aside>
+      </Suspense>
     </section>
   )
 }

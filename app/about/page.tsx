@@ -41,7 +41,7 @@ export default function About() {
         <li>💞️ I&apos;m looking to learn LowCode、ChatGpt</li>
         <li>
           📫 How to reach me? Email:{' '}
-          <CustomLink href={'mailto:gwt9502@163.com'}>
+          <CustomLink href={'mailto:gwt9502@163.com'} target="_blank">
             gwt9502@163.com
           </CustomLink>
         </li>

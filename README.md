@@ -24,9 +24,7 @@
 
 
 ## 📝 Next Todo
-- [ ] add Views Count from Database   
 - [ ] add Category Page
-- [ ] add Table of Contents
 
 
 ## 📄 License
