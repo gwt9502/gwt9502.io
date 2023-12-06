@@ -23,7 +23,7 @@ export function BlogCardHeader(props: Props) {
       </h3>
       <div className="text-sm leading-10 text-neutral-500 dark:text-white/80">
         {publishedAt} · {readingTime.words}字 · {Math.ceil(readingTime.minutes)}
-        分钟 · view {view} 次
+        分钟 · view {view.toLocaleString()} 次
       </div>
     </>
   )

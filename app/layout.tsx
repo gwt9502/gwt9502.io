@@ -57,6 +57,16 @@ export default function RootLayout({
         src="https://analytics.eu.umami.is/script.js"
         data-website-id={process.env.DATA_WEBSITE_ID}
       />
+      <Script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-T6VTVKX9GB"
+      />
+      <Script id="google-analy">
+        {`window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-T6VTVKX9GB');`}
+      </Script>
     </html>
   )
 }
