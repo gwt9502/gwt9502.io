@@ -13,7 +13,7 @@ export default function Giscus() {
     <div className="md:max-w-4xl m-auto my-10">
       <GiscusCom
         repo="gwt9502/gwt9502.io"
-        repoId={process.env.REPOID ?? ''}
+        repoId="R_kgDOKuG_nw"
         category="General"
         categoryId="DIC_kwDOKuG_n84Ca_uU"
         mapping="title"
