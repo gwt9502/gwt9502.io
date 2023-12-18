@@ -31,6 +31,15 @@ const nextConfig = {
       },
     ]
   },
+  async redirects() {
+    return ['/rss', '/rss.xml', '/feed'].map((route) => {
+      return {
+        source: route,
+        destination: '/feed.xml',
+        permanent: true,
+      }
+    })
+  },
 }
 
 // https://nextjs.org/docs/advanced-features/security-headers

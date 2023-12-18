@@ -45,6 +45,18 @@ export const metadata: Metadata = {
       'baidu-site-verification': 'codeva-0z4SD74T5D',
     },
   },
+  // RSS
+  alternates: {
+    canonical: 'https://199406.xyz',
+    types: {
+      'application/rss+xml': [
+        {
+          url: 'feed.xml',
+          title: 'RSS订阅',
+        },
+      ],
+    },
+  },
 }
 
 export default function RootLayout({

@@ -31,12 +31,14 @@
     "rehype-pretty-code": "^0.10.2",
     "rehype-slug": "^6.0.0",
     "remark-gfm": "3.0.1",
+    "rss": "^1.2.2",
     "shiki": "^0.14.5"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/rss": "^0.0.32",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.0.2",
