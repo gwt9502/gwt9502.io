@@ -1,0 +1,200 @@
+---
+title: 'React脚手架 react-scripts源码分析'
+publishedAt: '2023-12-28'
+summary: '了解react-scripts cli背后的原理，以及自定义自己的webpack打包配置'
+---
+
+## 前言
+我们通过[CRA](https://create-react-app.dev/)在初始化一个 `React` 项目的时候，通过在终端执行 `npm run start` 运行项目，然后浏览器打开 `https:localhost:3000` 就可以直接运行我们的项目，背后的原理是什么呢？
+
+## 入口文件
+通过在 `package.json` 文件找到，我们运行 `npm run start` 背后是通过运行 `react-scripts start` 启动项目，我们执行命令行把项目下载到本地
+
+```sh
+git clone https://github.com/facebook/create-react-app.git 
+```
+
+下载完成后，打开文件 `react-scripts/bin/react-scripts.js`
+> 该文件主要解析参数并执行对应的 `.js` 文件
+
+```js
+// 跨平台的spawn
+const spawn = require('react-dev-utils/crossSpawn');
+
+// 获取构建命令参数 如start、build、test、eject
+const args = process.argv.slice(2);
+
+const scriptIndex = args.findIndex(
+  x => x === 'build' || x === 'eject' || x === 'start' || x === 'test'
+);
+const script = scriptIndex === -1 ? args[0] : args[scriptIndex];
+
+// 获取node命令的参数
+const nodeArgs = scriptIndex > 0 ? args.slice(0, scriptIndex) : [];
+
+// 根据构建参数执行对应的文件
+if (['build', 'eject', 'start', 'test'].includes(script)) {
+  const result = spawn.sync(
+    process.execPath, // 绝对路径
+    nodeArgs
+      .concat(require.resolve('../scripts/' + script))
+      .concat(args.slice(scriptIndex + 1)),
+    { stdio: 'inherit' }
+  );
+  ...
+} else {
+  // 打印一些错误
+  console.log('Unknown script "' + script + '".');
+  console.log('Perhaps you need to update react-scripts?');
+  console.log(
+    'See: https://facebook.github.io/create-react-app/docs/updating-to-new-releases'
+  );
+}
+```
+
+## 分析文件
+打开 `scripts/start.js` 文件
+> 主要初始化 `webpack` 配置，通过 `webpack-dev-server` 本地启动一个node服务
+
+```js
+...
+const fs = require('fs');
+const chalk = require('react-dev-utils/chalk');
+const webpack = require('webpack');
+const WebpackDevServer = require('webpack-dev-server');
+const clearConsole = require('react-dev-utils/clearConsole');
+const checkRequiredFiles = require('react-dev-utils/checkRequiredFiles');
+const {
+  choosePort,
+  createCompiler,
+  prepareProxy,
+  prepareUrls,
+} = require('react-dev-utils/WebpackDevServerUtils');
+const openBrowser = require('react-dev-utils/openBrowser');
+const paths = require('../config/paths');
+const configFactory = require('../config/webpack.config');
+const createDevServerConfig = require('../config/webpackDevServer.config');
+
+// 判断nodejs是否在终端运行
+const isInteractive = process.stdout.isTTY;
+
+// 校验入口文件
+if (!checkRequiredFiles([paths.appHtml, paths.appIndexJs])) {
+  process.exit(1);
+}
+
+// 设置默认的端口和HOST
+const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+
+/**
+ * checkBrowsers内部使用browserslist，会从can-i-use数据库判断css、js支持的版本
+ * 会先校验package.json文件里面有没有browserslist字段
+ * 1.如果有直接返回promise
+ * 2.没有的话会在终端询问是否要添加browserslist
+*/
+const { checkBrowsers } = require('react-dev-utils/browsersHelper');
+checkBrowsers(paths.appPath, isInteractive)
+  .then(() => {
+    /**
+     * detect-port-alt校验当前端口是否被占用
+     * 如果被占用，提示是否使用另外的端口
+    */
+    return choosePort(HOST, DEFAULT_PORT);
+  })
+  .then(port => {
+    // 返回当前端口
+    if (port == null) {
+      // We have not found a port.
+      return;
+    }
+
+    /**
+     * configFactory有以下功能
+     * 初始化webpack配置
+     * 1.定义入口文件、输出文件
+     * 2.定义规则：处理图片、字体、css、jsx
+     * 3.使用插件
+     *  - HtmlWebpackPlugin 为html自动插入输出的js
+     *  - MiniCssExtractPlugin css压缩插件
+     *  - WebpackManifestPlugin 生成manifest.json
+     *  - ESLintPlugin 配置一些eslint规则
+    */
+    const config = configFactory('development');
+    const protocol = process.env.HTTPS === 'true' ? 'https' : 'http';
+    const appName = require(paths.appPackageJson).name;
+
+    // 判断是否使用ts
+    const useTypeScript = fs.existsSync(paths.appTsConfig);
+    // 通过协议、域名、端口组合成完成的地址字符串
+    const urls = prepareUrls(
+      protocol,
+      HOST,
+      port,
+      paths.publicUrlOrPath.slice(0, -1)
+    );
+    // 内部通过调用webpack(config) 生成一个compiler实例
+    const compiler = createCompiler({
+      appName,
+      config,
+      urls,
+      useYarn,
+      useTypeScript,
+      webpack,
+    });
+    // 获取package.json文件中的proxy字段
+    const proxySetting = require(paths.appPackageJson).proxy;
+    // 配置一些代理相关的信息
+    const proxyConfig = prepareProxy(
+      proxySetting,
+      paths.appPublic,
+      paths.publicUrlOrPath
+    );
+    // 配置WebpackDevServer参数
+    // https://github.com/webpack/webpack-dev-server
+    const serverConfig = {
+      ...createDevServerConfig(proxyConfig, urls.lanUrlForConfig),
+      host: HOST,
+      port,
+    };
+
+    // 创建本地服务器
+    const devServer = new WebpackDevServer(serverConfig, compiler);
+    // 服务启动后的回调
+    devServer.startCallback(() => {
+      if (isInteractive) {
+        clearConsole();
+      }
+
+      if (env.raw.FAST_REFRESH && semver.lt(react.version, '16.10.0')) {
+        console.log(
+          chalk.yellow(
+            `Fast Refresh requires React 16.10 or higher. You are using React ${react.version}.`
+          )
+        );
+      }
+
+      console.log(chalk.cyan('Starting the development server...\n'));
+      openBrowser(urls.localUrlForBrowser);
+    });
+  })
+...
+```
+
+## 总结
+
+- 如果想透彻的了解脚手架，必须读懂 [react-dev-uilts](https://github.com/facebook/create-react-app/tree/main/packages/react-dev-utils) 库
+- 内部原理为通过 [webpack-dev-server](https://github.com/webpack/webpack-dev-server)创建一个 `express` 服务，然后和浏览器建立一个 `webSocket` 链接进行通讯。[html-webpack-plugin](https://github.com/jantimon/html-webpack-plugin) 负责为本地的 `html` 文件注入 `js`
+- [detect-port-alt](https://github.com/node-modules/detect-port)会校验当前端口是否被占用
+- 在启动项目时，会检测 `process.env.BROWSERSLIST、process.env.BROWSERSLIST_CONFIG、browserslist、.browserslistrc、package.json` 文件中是否有 `browserslist` 信息，如果不存在会在 `package.json` 文件中自动添加默认值
+
+```json
+"browserslist": {
+  "production": [">0.2%", "not dead", "not op_mini all"],
+  "development": [
+    "last 1 chrome version",
+    "last 1 firefox version",
+    "last 1 safari version",
+  ],
+}
+```

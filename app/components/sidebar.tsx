@@ -7,7 +7,7 @@ import { useWindowScroll } from 'react-use'
 import { useMemo } from 'react'
 
 const navItems = [
-  { children: 'Category', href: '/category' },
+  // { children: 'Category', href: '/category' },
   { children: 'About', href: '/about' },
   { children: 'Github', href: 'https://github.com/gwt9502/gwt9502.io' },
   { children: 'RSS', href: '/rss' },
